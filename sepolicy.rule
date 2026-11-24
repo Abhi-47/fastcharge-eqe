@@ -1,0 +1,31 @@
+# FastCharge EQE - SELinux Policy Rules
+# Allows the module scripts to access charging/sysfs nodes
+
+# Allow magisk scripts to write to power_supply sysfs
+allow magisk_file power_supply_sysfs:file { read write open append };
+allow magisk_file power_supply_sysfs:dir { read write open search };
+
+# Allow writing to typec/port* sysfs
+allow magisk_file typec_sysfs:file { read write open append };
+allow magisk_file typec_sysfs:dir { read write open search };
+
+# Allow writing to thermal sysfs
+allow magisk_file thermal_sysfs:file { read write open append };
+allow magisk_file thermal_sysfs:dir { read write open search };
+
+# Allow setting vendor properties
+allow magisk_default_prop default_prop:property_service set;
+
+# Allow reading battery properties
+allow magisk_file battery_prop:property_service { get set };
+
+# For qcom USB controller access
+allow magisk_file qcom_usb_sysfs:file { read write open append };
+allow magisk_file qcom_usb_sysfs:dir { read write open search };
+
+# Allow kernel logging
+allow magisk_file kernel_msg:file { write append open };
+
+# Motorola-specific charging nodes
+allow magisk_file moto_charge_sysfs:file { read write open append };
+allow magisk_file moto_charge_sysfs:dir { read write open search };

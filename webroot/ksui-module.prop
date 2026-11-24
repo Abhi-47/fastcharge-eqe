@@ -1,0 +1,23 @@
+# FastCharge EQE - KSUI WebUI Module Configuration
+# Place this in the module root or reference from module.prop
+
+# KSUI WebUI registration
+# KSUI scans for modules with webui/ directory and index.html
+# This file tells KSUI how to load the UI
+
+webui.enabled=true
+webui.name=FastCharge EQE
+webui.description=Real-time charging monitor with voltage, current, power, temperature graphs
+webui.version=1.1
+webui.author=AK-47
+webui.entry=webui/index.html
+webui.api=webui/ksui-api.sh
+webui.port=8080
+webui.icon=battery-charging
+webui.category=Charging
+webui.permissions=read_battery,read_thermal,read_usb
+
+# KSUI will auto-detect this if placed in module root as ksui-module.prop
+# Or add to module.prop:
+# ksui.webui=true
+# ksui.webui.entry=webui/index.html

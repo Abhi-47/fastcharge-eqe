@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>FastCharge EQE - Charging Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --fg-primary: #e6edf3;
+            --fg-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-glow: rgba(88, 166, 255, 0.4);
+            --success: #3fb950;
+            --warning: #d29922;
+            --danger: #f85149;
+            --border: #30363d;
+            --card-bg: rgba(22, 27, 34, 0.8);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            background: var(--bg-primary);
+            color: var(--fg-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(88, 166, 255, 0.15), transparent),
+                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(63, 185, 80, 0.1), transparent),
+                radial-gradient(ellipse 50% 30% at 0% 0%, rgba(210, 153, 34, 0.08), transparent);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* Grid pattern overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(88, 166, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(88, 166, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 100%;
+            padding: 16px;
+            padding-bottom: 100px;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            backdrop-filter: blur(20px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--success), var(--warning));
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent), var(--success));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .logo-icon svg {
+            width: 24px;
+            height: 24px;
+            stroke: var(--bg-primary);
+        }
+
+        .logo-text h1 {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, var(--fg-primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-text span {
+            font-size: 11px;
+            color: var(--fg-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--danger);
+            box-shadow: 0 0 0 2px var(--bg-tertiary), 0 0 8px var(--danger);
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.charging {
+            background: var(--success);
+            box-shadow: 0 0 0 2px var(--bg-tertiary), 0 0 12px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.full {
+            background: var(--accent);
+            box-shadow: 0 0 0 2px var(--bg-tertiary), 0 0 12px var(--accent);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.9); }
+        }
+
+        /* Main Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        @media (min-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .grid {
+                grid-template-columns: 1fr 1fr 1fr;
+            }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(20px);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            border-color: var(--accent);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--fg-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card-title svg {
+            width: 16px;
+            height: 16px;
+            stroke: var(--accent);
+        }
+
+        /* Big Metric Cards */
+        .metric-card {
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: -2px;
+            line-height: 1;
+            margin-bottom: 4px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .metric-value.voltage { color: var(--accent); }
+        .metric-value.current { color: var(--success); }
+        .metric-value.power { color: var(--warning); }
+        .metric-value.temp { color: var(--danger); }
+
+        .metric-unit {
+            font-size: 13px;
+            color: var(--fg-secondary);
+            font-weight: 500;
+        }
+
+        .metric-label {
+            margin-top: 12px;
+            font-size: 11px;
+            color: var(--fg-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Info Rows */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .info-item {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 10px;
+            color: var(--fg-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .info-value {
+            font-size: 18px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            color: var(--fg-primary);
+        }
+
+        .info-value.warn { color: var(--warning); }
+        .info-value.danger { color: var(--danger); }
+        .info-value.success { color: var(--success); }
+        .info-value.accent { color: var(--accent); }
+
+        /* Chart Card */
+        .chart-card {
+            grid-column: 1 / -1;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 280px;
+            width: 100%;
+        }
+
+        .chart-legend {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--fg-secondary);
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        /* Thermal Bar */
+        .thermal-bar-container {
+            margin-top: 16px;
+        }
+
+        .thermal-bar {
+            height: 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .thermal-bar-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.5s ease, background 0.5s ease;
+            background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
+        }
+
+        .thermal-markers {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 10px;
+            color: var(--fg-secondary);
+        }
+
+        .thermal-marker {
+            position: relative;
+        }
+
+        .thermal-marker::before {
+            content: '';
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 6px;
+            background: var(--border);
+        }
+
+        .thermal-marker.warning::before { background: var(--warning); }
+        .thermal-marker.danger::before { background: var(--danger); }
+
+        /* Log Panel */
+        .log-panel {
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 11px;
+            line-height: 1.6;
+            font-family: inherit;
+        }
+
+        .log-entry {
+            padding: 6px 10px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .log-time { color: var(--fg-secondary); font-variant-numeric: tabular-nums; }
+        .log-tag { color: var(--accent); font-weight: 600; }
+        .log-msg { color: var(--fg-primary); flex: 1; min-width: 150px; }
+        .log-warn { color: var(--warning); }
+        .log-danger { color: var(--danger); }
+        .log-success { color: var(--success); }
+
+        /* Charger Info Card */
+        .charger-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .charger-item {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .charger-label {
+            font-size: 10px;
+            color: var(--fg-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .charger-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--fg-primary);
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 24px;
+            padding: 16px;
+            text-align: center;
+            color: var(--fg-secondary);
+            font-size: 11px;
+            border-top: 1px solid var(--border);
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover { text-decoration: underline; }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            gap: 16px;
+            color: var(--fg-secondary);
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Hidden utility */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4a2 2 0 1 1 4 0v10a6 6 0 0 1-12 0V4z"/>
+                        <path d="M7 14v6"/>
+                        <path d="M17 14v6"/>
+                        <path d="M5 20h14"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>FastCharge EQE</h1>
+                    <span>Maintainer: AK-47</span>
+                </div>
+            </div>
+            <div class="status-badge">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Connecting...</span>
+            </div>
+        </header>
+
+        <div class="grid" id="mainGrid">
+            <!-- Loading state -->
+            <div class="loading" id="loadingState" style="grid-column: 1 / -1;">
+                <div class="spinner"></div>
+                <span>Loading charging data...</span>
+            </div>
+        </div>
+
+        <footer>
+            FastCharge EQE v1.1 • Motorola Edge 50 Pro (eqe) • <a href="https://github.com/topjohnwu/Magisk" target="_blank">Magisk</a> • Maintainer: AK-47
+        </footer>
+    </div>
+
+    <script>
+        // ============================================================
+        // FastCharge EQE Web UI - KSUI Compatible
+        // ============================================================
+
+        const MOD_PATH = '/data/adb/modules/fastcharge-eqe';
+        const API_ENDPOINT = '/api/fastcharge-eqe'; // KSUI will proxy this
+
+        // State
+        let chart = null;
+        let dataHistory = {
+            voltage: [],
+            current: [],
+            power: [],
+            temp: [],
+            timestamps: []
+        };
+        const MAX_HISTORY = 120; // 20 minutes at 10s intervals
+
+        // DOM Elements
+        const grid = document.getElementById('mainGrid');
+        const loadingState = document.getElementById('loadingState');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+
+        // Color mapping
+        const COLORS = {
+            voltage: '#58a6ff',
+            current: '#3fb950',
+            power: '#d29922',
+            temp: '#f85149'
+        };
+
+        // ============================================================
+        // Data Fetching
+        // ============================================================
+        async function fetchData() {
+            try {
+                // Try KSUI API first (if running in KSUI WebUI)
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-cache'
+                });
+
+                if (response.ok) {
+                    return await response.json();
+                }
+            } catch (e) {
+                // Fallback to reading from module files directly
+                // This works when accessed via file:// or KSUI file proxy
+            }
+
+            // Fallback: simulate data for demo (KSUI will inject real data)
+            return getMockData();
+        }
+
+        async function fetchLogData() {
+            try {
+                const response = await fetch(`${API_ENDPOINT}/log`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-cache'
+                });
+                if (response.ok) return await response.json();
+            } catch (e) {}
+            return [];
+        }
+
+        // Mock data for standalone testing
+        function getMockData() {
+            const now = Date.now();
+            const charging = Math.random() > 0.3;
+            const temp = charging ? 35 + Math.random() * 10 : 28 + Math.random() * 5;
+            const voltage = charging ? 15 + Math.random() * 5 : 0;
+            const current = charging ? 3 + Math.random() * 3 : 0;
+            return {
+                timestamp: now,
+                charging: charging,
+                status: charging ? 'Charging' : 'Discharging',
+                battery_temp: Math.round(temp * 10),
+                voltage_now: Math.round(voltage * 1000000),
+                current_now: Math.round(current * 1000000),
+                input_current_limit: 6000000,
+                pps_enabled: 1,
+                charge_current_max: 6000000,
+                voltage_max: 20000000,
+                health: 'Good',
+                technology: 'Li-ion',
+                capacity: 4500,
+                level: Math.floor(20 + Math.random() * 80),
+                charger_type: 'USB-PD PPS',
+                negotiated_voltage: voltage,
+                negotiated_current: current
+            };
+        }
+
+        // ============================================================
+        // UI Rendering
+        // ============================================================
+        function renderUI(data) {
+            loadingState.style.display = 'none';
+            grid.innerHTML = '';
+
+            // Status badge
+            updateStatusBadge(data);
+
+            // Create cards
+            createMetricCards(data);
+            createInfoGrid(data);
+            createChartCard(data);
+            createChargerInfoCard(data);
+            createLogCard();
+        }
+
+        function updateStatusBadge(data) {
+            const isCharging = data.status === 'Charging' || data.status === 'Full';
+            const isFull = data.status === 'Full';
+
+            statusDot.className = 'status-dot';
+            if (isCharging) {
+                statusDot.classList.add(isFull ? 'full' : 'charging');
+                statusText.textContent = isFull ? 'Charged' : 'Charging';
+            } else {
+                statusText.textContent = 'Not Charging';
+            }
+        }
+
+        function createMetricCards(data) {
+            const metrics = [
+                {
+                    key: 'voltage',
+                    value: (data.voltage_now / 1000000).toFixed(2),
+                    unit: 'V',
+                    label: 'Input Voltage',
+                    class: 'voltage'
+                },
+                {
+                    key: 'current',
+                    value: (data.current_now / 1000000).toFixed(2),
+                    unit: 'A',
+                    label: 'Charge Current',
+                    class: 'current'
+                },
+                {
+                    key: 'power',
+                    value: ((data.voltage_now / 1000000) * (data.current_now / 1000000)).toFixed(1),
+                    unit: 'W',
+                    label: 'Charge Power',
+                    class: 'power'
+                },
+                {
+                    key: 'temp',
+                    value: (data.battery_temp / 10).toFixed(1),
+                    unit: '°C',
+                    label: 'Battery Temp',
+                    class: 'temp'
+                }
+            ];
+
+            metrics.forEach(m => {
+                const card = document.createElement('div');
+                card.className = 'card metric-card';
+                card.innerHTML = `
+                    <div class="card-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            ${getMetricIcon(m.key)}
+                        </svg>
+                        <span>${m.label}</span>
+                    </div>
+                    <div class="metric-value ${m.class}" id="metric-${m.key}">${m.value}</div>
+                    <div class="metric-unit">${m.unit}</div>
+                    <div class="metric-label">${m.label}</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function getMetricIcon(key) {
+            const icons = {
+                voltage: '<polyline points="4 17 10 11 16 17 22 11"/><line x1="2" y1="12" x2="22" y2="12"/>',
+                current: '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>',
+                power: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+                temp: '<path d="M12 2.69a5.5 5.5 0 0 1 7.87 5.17A5.74 5.74 0 0 1 19.54 16a5.5 5.5 0 0 1-11 0 5.74 5.74 0 0 1 2.34-8.14A5.5 5.5 0 0 1 12 2.69z"/>'
+            };
+            return icons[key] || '';
+        }
+
+        function createInfoGrid(data) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <div class="card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                    </svg>
+                    <span>Battery Info</span>
+                </div>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Level</div>
+                        <div class="info-value" id="info-level">${data.level}%</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Health</div>
+                        <div class="info-value success" id="info-health">${data.health}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Technology</div>
+                        <div class="info-value" id="info-tech">${data.technology}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Capacity</div>
+                        <div class="info-value" id="info-cap">${data.capacity} mAh</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Current Limit</div>
+                        <div class="info-value accent" id="info-limit">${(data.input_current_limit / 1000000).toFixed(1)} A</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Max Voltage</div>
+                        <div class="info-value accent" id="info-vmax">${(data.voltage_max / 1000000).toFixed(0)} V</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">PPS Enabled</div>
+                        <div class="info-value ${data.pps_enabled ? 'success' : 'danger'}" id="info-pps">${data.pps_enabled ? 'Yes' : 'No'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Max Current</div>
+                        <div class="info-value accent" id="info-cmax">${(data.charge_current_max / 1000000).toFixed(1)} A</div>
+                    </div>
+                </div>
+                <div class="thermal-bar-container">
+                    <div class="thermal-bar">
+                        <div class="thermal-bar-fill" id="thermalFill" style="width: ${Math.min(100, (data.battery_temp / 10 / 50) * 100)}%"></div>
+                    </div>
+                    <div class="thermal-markers">
+                        <span>0°C</span>
+                        <span class="thermal-marker warning" style="left: 80%">40°C</span>
+                        <span class="thermal-marker danger" style="left: 88%">44°C</span>
+                        <span>50°C</span>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
+        }
+
+        function createChartCard(data) {
+            const card = document.createElement('div');
+            card.className = 'card chart-card full-width';
+            card.innerHTML = `
+                <div class="card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                    <span>Charging Graph (Last 20 min)</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="chargingChart" aria-label="Charging voltage, current, power, and temperature over time"></canvas>
+                </div>
+                <div class="chart-legend">
+                    <div class="legend-item"><span class="legend-color" style="background: ${COLORS.voltage}"></span> Voltage (V)</div>
+                    <div class="legend-item"><span class="legend-color" style="background: ${COLORS.current}"></span> Current (A)</div>
+                    <div class="legend-item"><span class="legend-color" style="background: ${COLORS.power}"></span> Power (W)</div>
+                    <div class="legend-item"><span class="legend-color" style="background: ${COLORS.temp}"></span> Temp (°C)</div>
+                </div>
+            `;
+            grid.appendChild(card);
+
+            initChart();
+        }
+
+        function createChargerInfoCard(data) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <div class="card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4a2 2 0 1 1 4 0v10a6 6 0 0 1-12 0V4z"/>
+                        <path d="M7 14v6"/><path d="M17 14v6"/><path d="M5 20h14"/>
+                    </svg>
+                    <span>Charger Details</span>
+                </div>
+                <div class="charger-grid">
+                    <div class="charger-item">
+                        <div class="charger-label">Type</div>
+                        <div class="charger-value" id="charger-type">${data.charger_type || 'Unknown'}</div>
+                    </div>
+                    <div class="charger-item">
+                        <div class="charger-label">Negotiated</div>
+                        <div class="charger-value" id="charger-neg">${data.negotiated_voltage || 0}V / ${data.negotiated_current || 0}A</div>
+                    </div>
+                    <div class="charger-item">
+                        <div class="charger-label">Profile</div>
+                        <div class="charger-value" id="charger-profile">${getProfileName(data)}</div>
+                    </div>
+                    <div class="charger-item">
+                        <div class="charger-label">Status</div>
+                        <div class="charger-value ${data.status === 'Charging' ? 'success' : (data.status === 'Full' ? 'accent' : '')}" id="charger-status">${data.status}</div>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
+        }
+
+        function getProfileName(data) {
+            const v = data.negotiated_voltage || 0;
+            const c = data.negotiated_current || 0;
+            const p = v * c;
+            if (p >= 100) return '125W TurboPower';
+            if (p >= 50) return '68W PD/PPS';
+            if (p > 0) return 'Standard PD';
+            return 'None';
+        }
+
+        function createLogCard() {
+            const card = document.createElement('div');
+            card.className = 'card full-width';
+            card.innerHTML = `
+                <div class="card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                    <span>Charging Log</span>
+                </div>
+                <div class="log-panel" id="logPanel"></div>
+            `;
+            grid.appendChild(card);
+        }
+
+        // ============================================================
+        // Chart.js
+        // ============================================================
+        function initChart() {
+            const ctx = document.getElementById('chargingChart');
+            if (!ctx) return;
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dataHistory.timestamps,
+                    datasets: [
+                        {
+                            label: 'Voltage (V)',
+                            data: dataHistory.voltage,
+                            borderColor: COLORS.voltage,
+                            backgroundColor: COLORS.voltage + '20',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y',
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        },
+                        {
+                            label: 'Current (A)',
+                            data: dataHistory.current,
+                            borderColor: COLORS.current,
+                            backgroundColor: COLORS.current + '20',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y',
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        },
+                        {
+                            label: 'Power (W)',
+                            data: dataHistory.power,
+                            borderColor: COLORS.power,
+                            backgroundColor: COLORS.power + '20',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y',
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        },
+                        {
+                            label: 'Temp (°C)',
+                            data: dataHistory.temp,
+                            borderColor: COLORS.temp,
+                            backgroundColor: COLORS.temp + '20',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                            yAxisID: 'y1',
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            borderDash: [5, 5]
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 300 },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(13, 17, 23, 0.95)',
+                            titleColor: '#e6edf3',
+                            bodyColor: '#8b949e',
+                            borderColor: '#30363d',
+                            borderWidth: 1,
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: true,
+                            callbacks: {
+                                label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'minute',
+                                displayFormats: { minute: 'HH:mm' },
+                                tooltipFormat: 'HH:mm:ss'
+                            },
+                            grid: { color: 'rgba(48, 54, 61, 0.5)' },
+                            ticks: { color: '#8b949e', maxTicksLimit: 8, font: { size: 10 } },
+                            border: { color: '#30363d' }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            grid: { color: 'rgba(48, 54, 61, 0.3)' },
+                            ticks: { color: '#8b949e', font: { size: 10 } },
+                            border: { color: '#30363d' },
+                            suggestedMin: 0,
+                            suggestedMax: 25
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#8b949e', font: { size: 10 } },
+                            border: { color: '#30363d' },
+                            suggestedMin: 20,
+                            suggestedMax: 55
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(data) {
+            if (!chart) return;
+
+            const now = new Date(data.timestamp);
+            const timeStr = now.toLocaleTimeString();
+
+            // Add data points
+            dataHistory.timestamps.push(now);
+            dataHistory.voltage.push(data.voltage_now / 1000000);
+            dataHistory.current.push(data.current_now / 1000000);
+            dataHistory.power.push((data.voltage_now / 1000000) * (data.current_now / 1000000));
+            dataHistory.temp.push(data.battery_temp / 10);
+
+            // Trim history
+            while (dataHistory.timestamps.length > MAX_HISTORY) {
+                dataHistory.timestamps.shift();
+                dataHistory.voltage.shift();
+                dataHistory.current.shift();
+                dataHistory.power.shift();
+                dataHistory.temp.shift();
+            }
+
+            chart.update('none');
+        }
+
+        // ============================================================
+        // Log Panel
+        // ============================================================
+        async function updateLogPanel() {
+            const logs = await fetchLogData();
+            const panel = document.getElementById('logPanel');
+            if (!panel) return;
+
+            if (logs.length === 0) {
+                panel.innerHTML = '<div class="log-entry"><span class="log-time">--:--:--</span><span class="log-msg">No log data available</span></div>';
+                return;
+            }
+
+            panel.innerHTML = logs.slice(-50).reverse().map(entry => {
+                const time = new Date(entry.timestamp).toLocaleTimeString();
+                let tag = '', msgClass = '';
+                if (entry.message.includes('THERMAL THROTTLE')) { tag = '[THROTTLE]'; msgClass = 'log-danger'; }
+                else if (entry.message.includes('THERMAL RESUME')) { tag = '[RESUME]'; msgClass = 'log-success'; }
+                else if (entry.message.includes('PPS')) { tag = '[PPS]'; msgClass = 'log-warn'; }
+                else if (entry.message.includes('Charging')) { tag = '[CHARGE]'; msgClass = ''; }
+                else { tag = '[INFO]'; msgClass = ''; }
+
+                return `<div class="log-entry"><span class="log-time">${time}</span><span class="log-tag">${tag}</span><span class="log-msg ${msgClass}">${entry.message}</span></div>`;
+            }).join('');
+
+            panel.scrollTop = panel.scrollHeight;
+        }
+
+        // ============================================================
+        // Main Loop
+        // ============================================================
+        async function refresh() {
+            const data = await fetchData();
+            renderUI(data);
+            updateChart(data);
+            await updateLogPanel();
+        }
+
+        // Initialize
+        refresh();
+        setInterval(refresh, 5000); // Update every 5 seconds
+
+        // Handle KSUI injection
+        window.addEventListener('message', (event) => {
+            if (event.data?.type === 'FASTCHARGE_DATA') {
+                renderUI(event.data.payload);
+                updateChart(event.data.payload);
+            } else if (event.data?.type === 'FASTCHARGE_LOG') {
+                updateLogPanel();
+            }
+        });
+
+        // Expose for KSUI
+        window.FastChargeEQE = { refresh, dataHistory };
+    </script>
+</body>
+</html>

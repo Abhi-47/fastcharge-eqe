@@ -1,0 +1,8 @@
+id=fastcharge-eqe
+name=FastCharge EQE (Motorola Edge 50 Pro)
+version=2.0
+versionCode=4
+author=AK-47
+description=Enables USB-PD/PPS negotiation for Motorola Edge 50 Pro (eqe) with 125W TurboPower & 68W PD/PPS support. Forces PPS voltage/current negotiation, disables charging throttles, adds thermal tuning at 44°C throttle/40°C resume, optimizes for custom ROMs.
+support=https://github.com/topjohnwu/Magisk
+minMagisk=26000
