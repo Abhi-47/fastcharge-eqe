@@ -1,6 +1,6 @@
 # FastCharge EQE - Motorola Edge 50 Pro (eqe)
 
-Magisk module to enable USB-PD/PPS negotiation and maximize charging speed for the Motorola Edge 50 Pro with **125W TurboPower** and **68W PD/PPS** charging support. Includes **KSUI WebUI** for real-time charging monitoring.
+Magisk module to enable USB-PD/PPS negotiation and maximize charging speed for the Motorola Edge 50 Pro with **125W TurboPower** and **68W PD/PPS** charging support.
 
 ## Features
 
@@ -11,7 +11,6 @@ Magisk module to enable USB-PD/PPS negotiation and maximize charging speed for t
 - **Maximum Current/Voltage Limits** - Sets input current to 6A and voltage to 20V for 125W peak
 - **Thermal Tuning** - **Throttles at 44°C, resumes at 40°C** (protects battery while maximizing speed)
 - **Runtime Monitoring** - Background service maintains optimal settings during charging
-- **KSUI WebUI** - Real-time voltage, current, power, temperature graphs with charging history
 - **Custom ROM Compatible** - Works with LineageOS, PixelOS, crDroid, and other AOSP-based ROMs
 - **SELinux Policy** - Proper permissions for sysfs access
 
@@ -20,18 +19,16 @@ Magisk module to enable USB-PD/PPS negotiation and maximize charging speed for t
 - Motorola Edge 50 Pro (codename: `eqe`)
 - Magisk 26.0+ (rooted)
 - Android 14+ (tested on stock ROM and custom ROMs)
-- **KSUI** (KernelSU Manager) for WebUI access
 - Compatible charger:
   - **125W**: Motorola 125W TurboPower charger (proprietary)
   - **68W**: Any USB-PD 3.0 PPS charger (65W+ recommended, e.g., 68W/100W/140W GaN chargers)
 
 ## Installation
 
-1. Download the latest `FastCharge-EQE-v1.1-ksui.zip` from releases
+1. Download `FastCharge-EQE-v2.0-noui.zip` from releases
 2. Open Magisk app → Modules → Install from storage
 3. Select the ZIP file
 4. Reboot device
-5. Open **KSUI app** → **Modules** → **FastCharge EQE** → Tap to open WebUI
 
 ## How It Works
 
@@ -48,17 +45,7 @@ Magisk module to enable USB-PD/PPS negotiation and maximize charging speed for t
 - Monitors charging status every 10 seconds
 - **Dynamically throttles to 3A at 44°C+, restores 6A at 40°C**
 - Ensures PPS stays enabled during active charging
-- **KSUI WebUI API**: Updates `/data/adb/modules/fastcharge-eqe/webui/charge_data.json` every 2 seconds
 - Logs charging metrics (voltage, current, temp) to `/data/adb/modules/fastcharge-eqe/charge.log`
-
-### KSUI WebUI (webui/index.html)
-- Real-time metrics: Voltage (V), Current (A), Power (W), Temperature (°C)
-- Live charging graph (last 20 minutes) with Chart.js
-- Battery info: level, health, technology, capacity, limits
-- Charger details: type, negotiated voltage/current, active profile
-- Thermal progress bar with 40°C/44°C markers
-- Charging log with color-coded entries (throttle, resume, PPS, info)
-- Responsive design, works on mobile and desktop
 
 ## Verification
 
@@ -67,9 +54,7 @@ After installation and reboot:
 1. Check log: `cat /data/adb/modules/fastcharge-eqe/charge.log`
 2. Verify PPS: `cat /sys/class/power_supply/usb/pps_enabled` (should be `1`)
 3. Check current limit: `cat /sys/class/power_supply/usb/input_current_limit` (should be `6000000`)
-4. Check WebUI data: `cat /data/adb/modules/fastcharge-eqe/webui/charge_data.json`
-5. Open KSUI app → Modules → FastCharge EQE → View WebUI
-6. Check thermal behavior: charge.log will show "THERMAL THROTTLE" / "THERMAL RESUME" messages
+4. Check thermal behavior: charge.log will show "THERMAL THROTTLE" / "THERMAL RESUME" messages
 
 ## Compatibility Notes
 
@@ -91,7 +76,6 @@ After installation and reboot:
 | No PPS negotiation | Verify charger supports PPS, check cable (must be USB-C 3.0+ rated, 5A capable) |
 | Charging still slow | Check `charge.log` for errors, verify sysfs nodes exist on your ROM |
 | Overheating | Module throttles at 44°C automatically; use lower wattage charger if persistent |
-| WebUI not showing | Ensure KSUI is installed and updated; reboot after module install |
 | Bootloop | Disable module via Magisk recovery mode (hold Vol+ during boot) |
 
 ## Uninstall
@@ -133,21 +117,19 @@ persist.vendor.charge.profile_125w=1
 persist.vendor.charge.profile_68w=1
 ```
 
-### WebUI Data File
-```
-/data/adb/modules/fastcharge-eqe/webui/charge_data.json (updated every 2s)
-```
-
 ## Changelog
 
-### v1.1 (Current)
+### v2.0 (Current)
+- **Removed WebUI** (was unstable; module now focuses on core charging)
 - Added **68W USB-PD 3.0 PPS** support (20V/3.4A)
 - Added **thermal tuning: throttle at 44°C, resume at 40°C**
 - Added **custom ROM compatibility** (extra sysfs nodes)
 - Runtime thermal management in service.sh (10s monitoring)
-- **KSUI WebUI** with real-time graphs and monitoring
 - Maintainer: **AK-47**
 - Enhanced logging (voltage, current, temperature)
+
+### v1.1
+- Initial KSUI WebUI with real-time graphs (removed in v2.0)
 
 ### v1.0
 - Initial release with 125W TurboPower support
@@ -161,9 +143,7 @@ persist.vendor.charge.profile_68w=1
 
 - Motorola Edge 50 Pro community
 - Magisk @topjohnwu
-- KernelSU / KSUI team
 - USB-PD/PPS specification contributors
-- Chart.js for graphing
 - **Maintainer: AK-47**
 
 ## License
